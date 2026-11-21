@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Astro Dodger</title>
+  <style>
+    :root {
+      --bg: #0e1116;
+      --surface: #161b22;
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+    }
+    .shell {
+      width: 100%;
+      max-width: 720px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .stats { display: flex; gap: 20px; font-size: 13px; color: var(--muted); }
+    .stats strong { color: var(--text); font-family: ui-monospace, monospace; margin-left: 6px; font-variant-numeric: tabular-nums; }
+    button {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #1f2630;
+      color: var(--text);
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #111827;
+      border-color: transparent;
+      padding: 10px 22px;
+      font-size: 14px;
+    }
+    .stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      background: #0b0f17;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas { width: 100%; height: 100%; display: block; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 15, 23, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+      padding: 20px;
+    }
+    .overlay.hidden { display: none; }
+    .overlay p { font-size: 14px; color: var(--muted); max-width: 340px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="hud">
+      <div class="stats">
+        <span>Score<strong id="score">0</strong></span>
+        <span>Best<strong id="best">0</strong></span>
+      </div>
+      <button id="restartBtn" type="button">Restart</button>
+    </div>
+
+    <div class="stage">
+      <canvas id="canvas" width="720" height="450"></canvas>
+      <div class="overlay" id="overlay">
+        <h2 id="overTitle">Astro Dodger</h2>
+        <p id="overDesc">Pilot with Arrow Keys, WASD, or mouse pointer. Dodge asteroids and collect amber energy cells.</p>
+        <button id="startBtn" class="primary" type="button">Launch Craft</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const overlay = document.getElementById('overlay');
+    const overTitle = document.getElementById('overTitle');
+    const overDesc = document.getElementById('overDesc');
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const STORAGE_KEY = 'arcadevault_dodger_best';
+
+    let state = 'TITLE_MENU';
+    let ship = { x: 360, y: 360, r: 14 };
+    let rocks = [], cells = [], stars = [];
+    let score = 0, best = Number(localStorage.getItem(STORAGE_KEY) || 0), frame = 0;
+    let keys = {};
+    let raf = null;
+
+    bestEl.textContent = String(best);
+
+    for (let i = 0; i < 65; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        s: Math.random() * 1.8 + 0.6,
+        v: Math.random() * 1.4 + 0.5
+      });
+    }
+
+    function startGame() {
+      cancelAnimationFrame(raf);
+      ship = { x: canvas.width / 2, y: canvas.height - 70, r: 13 };
+      rocks = [];
+      cells = [];
+      score = 0;
+      frame = 0;
+      scoreEl.textContent = '0';
+      state = 'PLAYING';
+      overlay.classList.add('hidden');
+      loop();
+    }
+
+    function update() {
+      frame++;
+      const spd = 5.5;
+      if (keys['ArrowLeft'] || keys['a'] || keys['A']) ship.x -= spd;
+      if (keys['ArrowRight'] || keys['d'] || keys['D']) ship.x += spd;
+      if (keys['ArrowUp'] || keys['w'] || keys['W']) ship.y -= spd;
+      if (keys['ArrowDown'] || keys['s'] || keys['S']) ship.y += spd;
+      ship.x = Math.max(20, Math.min(canvas.width - 20, ship.x));
+      ship.y = Math.max(20, Math.min(canvas.height - 20, ship.y));
+
+      stars.forEach(st => {
+        st.y += st.v;
+        if (st.y > canvas.height) { st.y = 0; st.x = Math.random() * canvas.width; }
+      });
+
+      const spawnRate = Math.max(12, 30 - Math.floor(frame / 180));
+      if (frame % spawnRate === 0) {
+        rocks.push({
+          x: Math.random() * (canvas.width - 40) + 20,
+          y: -25,
+          r: Math.random() * 14 + 12,
+          vy: 2.5 + Math.min(4.5, frame / 320) + Math.random() * 1.5,
+          vx: (Math.random() - 0.5) * 1.2
+        });
+      }
+      if (frame % 75 === 0) {
+        cells.push({
+          x: Math.random() * (canvas.width - 60) + 30,
+          y: -16,
+          r: 9,
+          vy: 2.4
+        });
+      }
+
+      rocks.forEach(rk => { rk.x += rk.vx; rk.y += rk.vy; });
+      rocks = rocks.filter(rk => rk.y < canvas.height + 40);
+
+      cells.forEach(cl => { cl.y += cl.vy; });
+      cells = cells.filter(cl => {
+        const hit = Math.hypot(cl.x - ship.x, cl.y - ship.y) < cl.r + ship.r;
+        if (hit) { score += 25; scoreEl.textContent = String(score); return false; }
+        return cl.y < canvas.height + 30;
+      });
+
+      if (frame % 15 === 0) {
+        score += 1;
+        scoreEl.textContent = String(score);
+      }
+
+      for (const rk of rocks) {
+        if (Math.hypot(rk.x - ship.x, rk.y - ship.y) < rk.r + ship.r - 3) {
+          state = 'GAME_OVER';
+          if (score > best) {
+            best = score;
+            localStorage.setItem(STORAGE_KEY, String(best));
+            bestEl.textContent = String(best);
+          }
+          overTitle.textContent = 'Hull Breached';
+          overDesc.textContent = `Score: ${score} · Best record: ${best}`;
+          startBtn.textContent = 'Play Again';
+          overlay.classList.remove('hidden');
+          return;
+        }
+      }
+    }
+
+    function draw() {
+      ctx.fillStyle = '#0b0f17';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      stars.forEach(st => { ctx.fillRect(st.x, st.y, st.s, st.s); });
+
+      // Energy cells
+      cells.forEach(cl => {
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(cl.x, cl.y, cl.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Asteroids
+      rocks.forEach(rk => {
+        ctx.fillStyle = '#475569';
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(rk.x, rk.y, rk.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+
+      // Ship
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.moveTo(ship.x, ship.y - 16);
+      ctx.lineTo(ship.x + 13, ship.y + 12);
+      ctx.lineTo(ship.x, ship.y + 6);
+      ctx.lineTo(ship.x - 13, ship.y + 12);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function loop() {
+      if (state !== 'PLAYING') return;
+      update();
+      draw();
+      raf = requestAnimationFrame(loop);
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (state !== 'PLAYING') return;
+      const rect = canvas.getBoundingClientRect();
+      ship.x = ((e.clientX - rect.left) / rect.width) * canvas.width;
+      ship.y = ((e.clientY - rect.top) / rect.height) * canvas.height;
+    });
+    window.addEventListener('keydown', (e) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+      keys[e.key] = true;
+    });
+    window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', startGame);
+    draw();
+  </script>
+</body>
+</html>

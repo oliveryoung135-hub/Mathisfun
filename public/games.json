@@ -1,0 +1,56 @@
+[
+  {
+    "id": "grid-snake",
+    "title": "Grid Snake",
+    "category": "Arcade",
+    "controls": "Arrow Keys / WASD",
+    "description": "Navigate the grid, collect energy apples, and avoid walls or your growing tail.",
+    "thumbnail": "/src/assets/images/cover_grid_snake_1795229273029.jpg",
+    "iframe": "<iframe src=\"/games/snake.html\" title=\"Grid Snake\" allow=\"fullscreen\" loading=\"lazy\"></iframe>"
+  },
+  {
+    "id": "puzzle-2048",
+    "title": "2048 Classic",
+    "category": "Puzzle",
+    "controls": "Arrow Keys / Swipe",
+    "description": "Slide matching ceramic number tiles together to reach the 2048 tile.",
+    "thumbnail": "/src/assets/images/cover_puzzle_2048_1795229273247.jpg",
+    "iframe": "<iframe src=\"/games/2048.html\" title=\"2048 Classic\" allow=\"fullscreen\" loading=\"lazy\"></iframe>"
+  },
+  {
+    "id": "brick-breaker",
+    "title": "Brick Breaker",
+    "category": "Arcade",
+    "controls": "Mouse / A & D Keys",
+    "description": "Deflect the energy sphere with your paddle to shatter anodized brick formations.",
+    "thumbnail": "/src/assets/images/cover_brick_breaker_1795229272910.jpg",
+    "iframe": "<iframe src=\"/games/breakout.html\" title=\"Brick Breaker\" allow=\"fullscreen\" loading=\"lazy\"></iframe>"
+  },
+  {
+    "id": "block-stacker",
+    "title": "Block Stacker",
+    "category": "Puzzle",
+    "controls": "Arrows / Space to Drop",
+    "description": "Rotate and drop interlocking polyomino blocks to clear horizontal lines.",
+    "thumbnail": "/src/assets/images/cover_block_stacker_1795229274183.jpg",
+    "iframe": "<iframe src=\"/games/blocks.html\" title=\"Block Stacker\" allow=\"fullscreen\" loading=\"lazy\"></iframe>"
+  },
+  {
+    "id": "minesweeper",
+    "title": "Minesweeper",
+    "category": "Puzzle",
+    "controls": "Left Reveal / Right Flag",
+    "description": "Deduce hidden mine coordinates across the slate grid using numeric proximity clues.",
+    "thumbnail": "/src/assets/images/cover_minesweeper_1795229273606.jpg",
+    "iframe": "<iframe src=\"/games/minesweeper.html\" title=\"Minesweeper\" allow=\"fullscreen\" loading=\"lazy\"></iframe>"
+  },
+  {
+    "id": "astro-dodger",
+    "title": "Astro Dodger",
+    "category": "Arcade",
+    "controls": "Mouse / Arrow Keys",
+    "description": "Pilot a delta-wing craft through dense asteroid fields and gather fuel cells.",
+    "thumbnail": "/src/assets/images/cover_astro_dodger_1795229273669.jpg",
+    "iframe": "<iframe src=\"/games/dodger.html\" title=\"Astro Dodger\" allow=\"fullscreen\" loading=\"lazy\"></iframe>"
+  }
+]

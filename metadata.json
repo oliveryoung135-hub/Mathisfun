@@ -1,0 +1,6 @@
+{
+  "name": "ArcadeVault",
+  "description": "An unblocked browser games portal powered by HTML, CSS, JavaScript, and a JSON iframe catalog.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

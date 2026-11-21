@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2048 Classic</title>
+  <style>
+    :root {
+      --bg: #0e1116;
+      --surface: #161b22;
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+    }
+    .shell {
+      width: 100%;
+      max-width: 440px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .stats { display: flex; gap: 18px; font-size: 13px; color: var(--muted); }
+    .stats strong {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, monospace;
+      margin-left: 6px;
+    }
+    .actions { display: flex; gap: 8px; }
+    button {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #1f2630;
+      color: var(--text);
+      cursor: pointer;
+    }
+    button:hover { background: #28313e; }
+    button.primary {
+      background: var(--accent);
+      color: #111827;
+      border-color: transparent;
+      padding: 10px 20px;
+      font-size: 14px;
+    }
+    .grid-wrap {
+      position: relative;
+      background: #19202a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      aspect-ratio: 1 / 1;
+    }
+    .tile {
+      background: #232b37;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-weight: 700;
+      font-size: 26px;
+      font-variant-numeric: tabular-nums;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+    .t-0 { background: #202732; color: transparent; }
+    .t-2 { background: #e5e7eb; color: #111827; }
+    .t-4 { background: #fde68a; color: #111827; }
+    .t-8 { background: #fbbf24; color: #111827; }
+    .t-16 { background: #f59e0b; color: #111827; }
+    .t-32 { background: #ea580c; color: #ffffff; }
+    .t-64 { background: #dc2626; color: #ffffff; }
+    .t-128 { background: #0d9488; color: #ffffff; font-size: 22px; }
+    .t-256 { background: #0284c7; color: #ffffff; font-size: 22px; }
+    .t-512 { background: #4f46e5; color: #ffffff; font-size: 22px; }
+    .t-1024 { background: #7c3aed; color: #ffffff; font-size: 19px; }
+    .t-2048 { background: #10b981; color: #ffffff; font-size: 19px; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: rgba(14, 17, 22, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+      padding: 20px;
+    }
+    .overlay.hidden { display: none; }
+    .hint {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="hud">
+      <div class="stats">
+        <span>Score<strong id="score">0</strong></span>
+        <span>Best<strong id="best">0</strong></span>
+      </div>
+      <div class="actions">
+        <button id="undoBtn" type="button">Undo</button>
+        <button id="newBtn" type="button">Restart</button>
+      </div>
+    </div>
+
+    <div class="grid-wrap" id="gridWrap">
+      <div class="grid" id="grid"></div>
+      <div class="overlay hidden" id="overlay">
+        <h2 id="overTitle">No More Moves</h2>
+        <p id="overDesc" style="color: var(--muted); font-size: 14px;"></p>
+        <button id="retryBtn" class="primary" type="button">Play Again</button>
+      </div>
+    </div>
+    <p class="hint">Use Arrow Keys, WASD, or swipe on touchscreens to combine tiles.</p>
+  </div>
+
+  <script>
+    const gridEl = document.getElementById('grid');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const overlay = document.getElementById('overlay');
+    const overTitle = document.getElementById('overTitle');
+    const overDesc = document.getElementById('overDesc');
+    const undoBtn = document.getElementById('undoBtn');
+    const newBtn = document.getElementById('newBtn');
+    const retryBtn = document.getElementById('retryBtn');
+    const STORAGE_KEY = 'arcadevault_2048_best';
+
+    let board = [];
+    let score = 0;
+    let best = Number(localStorage.getItem(STORAGE_KEY) || 0);
+    let prevState = null;
+    let wonOnce = false;
+
+    bestEl.textContent = String(best);
+
+    function init() {
+      board = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
+      score = 0;
+      prevState = null;
+      wonOnce = false;
+      overlay.classList.add('hidden');
+      addRandom();
+      addRandom();
+      render();
+    }
+
+    function addRandom() {
+      const empty = [];
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          if (board[r][c] === 0) empty.push([r, c]);
+        }
+      }
+      if (!empty.length) return;
+      const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+      board[r][c] = Math.random() < 0.9 ? 2 : 4;
+    }
+
+    function slideLine(line) {
+      const nums = line.filter(v => v !== 0);
+      const out = [];
+      let gained = 0;
+      for (let i = 0; i < nums.length; i++) {
+        if (i + 1 < nums.length && nums[i] === nums[i + 1]) {
+          const val = nums[i] * 2;
+          out.push(val);
+          gained += val;
+          i++;
+        } else {
+          out.push(nums[i]);
+        }
+      }
+      while (out.length < 4) out.push(0);
+      return { out, gained };
+    }
+
+    function move(dir) {
+      const snapshot = board.map(r => [...r]);
+      const prevScore = score;
+      let moved = false;
+
+      if (dir === 'left' || dir === 'right') {
+        for (let r = 0; r < 4; r++) {
+          const row = dir === 'right' ? [...board[r]].reverse() : [...board[r]];
+          const { out, gained } = slideLine(row);
+          const finalRow = dir === 'right' ? out.reverse() : out;
+          if (finalRow.some((v, idx) => v !== board[r][idx])) moved = true;
+          board[r] = finalRow;
+          score += gained;
+        }
+      } else {
+        for (let c = 0; c < 4; c++) {
+          const col = [board[0][c], board[1][c], board[2][c], board[3][c]];
+          const line = dir === 'down' ? col.reverse() : col;
+          const { out, gained } = slideLine(line);
+          const finalCol = dir === 'down' ? out.reverse() : out;
+          for (let r = 0; r < 4; r++) {
+            if (board[r][c] !== finalCol[r]) moved = true;
+            board[r][c] = finalCol[r];
+          }
+          score += gained;
+        }
+      }
+
+      if (!moved) return;
+      prevState = { board: snapshot, score: prevScore };
+      addRandom();
+      if (score > best) {
+        best = score;
+        localStorage.setItem(STORAGE_KEY, String(best));
+      }
+      render();
+      checkState();
+    }
+
+    function hasMoves() {
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          if (board[r][c] === 0) return true;
+          if (c < 3 && board[r][c] === board[r][c + 1]) return true;
+          if (r < 3 && board[r][c] === board[r + 1][c]) return true;
+        }
+      }
+      return false;
+    }
+
+    function checkState() {
+      if (!wonOnce && board.some(r => r.includes(2048))) {
+        wonOnce = true;
+        overTitle.textContent = '2048 Reached!';
+        overDesc.textContent = `Score: ${score}. Restart or keep pushing higher.`;
+        retryBtn.textContent = 'Continue';
+        retryBtn.onclick = () => { overlay.classList.add('hidden'); retryBtn.onclick = init; retryBtn.textContent = 'Play Again'; };
+        overlay.classList.remove('hidden');
+        return;
+      }
+      if (!hasMoves()) {
+        overTitle.textContent = 'No More Moves';
+        overDesc.textContent = `Final score: ${score} · Best: ${best}`;
+        retryBtn.textContent = 'Play Again';
+        retryBtn.onclick = init;
+        overlay.classList.remove('hidden');
+      }
+    }
+
+    function render() {
+      scoreEl.textContent = String(score);
+      bestEl.textContent = String(best);
+      gridEl.innerHTML = '';
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          const val = board[r][c];
+          const cell = document.createElement('div');
+          cell.className = `tile t-${val <= 2048 ? val : 2048}`;
+          cell.textContent = val > 0 ? String(val) : '';
+          gridEl.appendChild(cell);
+        }
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') move('left');
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') move('right');
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') move('up');
+      if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') move('down');
+    });
+
+    let sx = 0, sy = 0;
+    const wrap = document.getElementById('gridWrap');
+    wrap.addEventListener('touchstart', (e) => {
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+    }, { passive: true });
+    wrap.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = e.changedTouches[0].clientY - sy;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+      if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+      else move(dy > 0 ? 'down' : 'up');
+    }, { passive: true });
+
+    undoBtn.addEventListener('click', () => {
+      if (!prevState) return;
+      board = prevState.board;
+      score = prevState.score;
+      prevState = null;
+      overlay.classList.add('hidden');
+      render();
+    });
+    newBtn.addEventListener('click', init);
+    retryBtn.onclick = init;
+
+    init();
+  </script>
+</body>
+</html>
